@@ -129,6 +129,38 @@ for col in range(bricks_col):
 
 
 ######################顯示文字設定#####################
+font_path = "C:/Windows/Fonts/msjh.ttc"
+font = pygame.font.Font(font_path, 32)
+score = 0
+lives = 3  # 新增：剩餘機會
+game_over = False  # 新增：遊戲結束狀態
+
+
+def reset_game():
+    global score, lives, game_over, bricks, ball, pad
+    score = 0
+    lives = 3
+    game_over = False
+    bricks.clear()
+    for col in range(bricks_col):
+        for row in range(bricks_row):
+            x = col * (brick_w + bricks_gap) + 70
+            y = row * (brick_h + bricks_gap) + 60
+            color = (
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+            )
+            brick = Brick(x, y, brick_w, brick_h, color)
+            bricks.append(brick)
+    pad.rect.x = 0
+    pad.rect.y = bg_y - 48
+    ball.x = pad.rect.x + pad.rect.width // 2
+    ball.y = pad.rect.y - ball_radius
+    ball.speed_x = 5
+    ball.speed_y = -5
+    ball.is_moving = False
+
 
 ######################底板設定######################
 pad = Brick(0, bg_y - 48, brick_w, brick_h, (70, 138, 180))  # 初始化底板物件
@@ -146,33 +178,64 @@ ball = Ball(
 FPS = pygame.time.Clock()  # 設定FPS
 ######################主程式######################
 while True:
-    FPS.tick(6000)  # 設定FPS為6000
+    FPS.tick(60)  # 設定FPS為6000
     screen.fill((0, 0, 0))  # 清除畫面
     mos_x, mos_y = pygame.mouse.get_pos()
-    pad.rect.x = mos_x - pad.rect.width // 2
+    # 只有遊戲未結束時才移動底板
+    if not game_over:
+        pad.rect.x = mos_x - pad.rect.width // 2
 
-    if pad.rect.x < 0:
-        pad.rect.x = 0
-    if pad.rect.x + pad.rect.width > bg_x:
-        pad.rect.x = bg_x - pad.rect.width
+        if pad.rect.x < 0:
+            pad.rect.x = 0
+        if pad.rect.x + pad.rect.width > bg_x:
+            pad.rect.x = bg_x - pad.rect.width
 
-    if not ball.is_moving:
+    # 處理球與遊戲狀態
+    if not ball.is_moving and not game_over:
         ball.x = pad.rect.x + pad.rect.width // 2
         ball.y = pad.rect.y - ball_radius
-    else:
+    elif not game_over:
+        prev_y = ball.y
         ball.move()
         ball.check_collision(bg_x, bg_y, bricks, pad)
+        # 檢查球是否掉到底下
+        if not ball.is_moving and prev_y < bg_y and ball.y + ball.radius > bg_y:
+            lives -= 1
+            if lives <= 0:
+                game_over = True
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:  # 如果按下{X}就退出
             sys.exit()  # 離開遊戲
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if not ball.is_moving:
+            # 只有在遊戲結束或一開始才可重新開始
+            if game_over or (not ball.is_moving and lives == 3):
+                reset_game()
+            elif not ball.is_moving and not game_over:
                 ball.is_moving = True
 
     for brick in bricks:
         brick.draw(screen)
 
+    # 顯示分數
+    score_surface = font.render(f"分數: {score}", True, (255, 255, 255))
+    screen.blit(score_surface, (10, 10))
+    # 顯示剩餘機會
+    lives_surface = font.render(f"機會: {lives}", True, (255, 255, 255))
+    screen.blit(lives_surface, (10, 50))
+
     pad.draw(screen)
     ball.draw(screen)  # 繪製球
+
+    # 顯示遊戲結束
+    if game_over:
+        over_surface = font.render("遊戲結束", True, (255, 0, 0))
+        screen.blit(
+            over_surface, (bg_x // 2 - over_surface.get_width() // 2, bg_y // 2 - 40)
+        )
+        tip_surface = font.render("按滑鼠左鍵重新開始", True, (255, 255, 255))
+        screen.blit(
+            tip_surface, (bg_x // 2 - tip_surface.get_width() // 2, bg_y // 2 + 10)
+        )
+
     pygame.display.update()  # 更新視窗
