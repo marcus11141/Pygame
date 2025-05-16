@@ -231,7 +231,7 @@ for col in range(bricks_col):
 font_path = "C:/Windows/Fonts/msjh.ttc"
 font = pygame.font.Font(font_path, 32)  # 設定字體與大小
 score = 0  # 分數初始化
-lives = 3  # 新增：剩餘機會
+lives = 5  # 新增：剩餘機會（改成5）
 game_over = False  # 新增：遊戲結束狀態
 
 # 新增：初始化閃光彈狀態與持續時間
@@ -248,7 +248,7 @@ DECOY_DURATION = 1000  # 毫秒
 def reset_game():
     global score, lives, game_over, bricks, ball, pad
     score = 0
-    lives = 3
+    lives = 5  # 重設時也改成5
     game_over = False
     bricks.clear()
     total_bricks = bricks_row * bricks_col
@@ -409,9 +409,19 @@ while True:
     pad.draw(screen)
     ball.draw(screen)  # 繪製球
 
-    # 顯示遊戲結束
+    # 勝利判斷
+    if score >= 60 and not game_over:
+        game_over = True
+        win = True
+    else:
+        win = False
+
+    # 顯示遊戲結束或勝利
     if game_over:
-        over_surface = font.render("遊戲結束", True, (255, 0, 0))
+        if win:
+            over_surface = font.render("勝利！", True, (0, 255, 0))
+        else:
+            over_surface = font.render("遊戲結束", True, (255, 0, 0))
         screen.blit(
             over_surface, (bg_x // 2 - over_surface.get_width() // 2, bg_y // 2 - 40)
         )
