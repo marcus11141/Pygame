@@ -9,7 +9,7 @@ class Brick:
     def __init__(self, x, y, width, height, color, brick_type="normal"):
         """
         初始磚塊
-        brick_type: "normal" 普通, "heal" 治療, "bomb" 爆炸, "flash" 閃光彈, "thermite" 鋁熱彈
+        brick_type: "normal" 普通, "heal" 治療, "bomb" 爆炸, "flash" 閃光彈, "thermite" 鋁熱彈, "jammer" 干擾彈
         """
         self.rect = pygame.Rect(x, y, width, height)
         self.color = color
@@ -29,6 +29,9 @@ class Brick:
                 pygame.draw.rect(display_area, (0, 0, 0), self.rect, 2)
             elif self.type == "thermite":
                 pygame.draw.rect(display_area, (255, 140, 0), self.rect)
+                pygame.draw.rect(display_area, (255, 255, 255), self.rect, 2)
+            elif self.type == "jammer":
+                pygame.draw.rect(display_area, (128, 128, 128), self.rect)
                 pygame.draw.rect(display_area, (255, 255, 255), self.rect, 2)
             else:
                 pygame.draw.rect(display_area, self.color, self.rect)
@@ -75,6 +78,7 @@ class Ball:
         pad: 底板物件\n
         """
         global score, lives, flash_active, flash_start_time
+        global jammer_active, jammer_x, jammer_slide_count
         # 檢查是否碰到邊界
         if self.x - self.radius <= 0 or self.x + self.radius >= bg_x:
             self.speed_x = -self.speed_x
@@ -107,12 +111,16 @@ class Ball:
                     elif brick.type == "flash":
                         flash_active = True
                         flash_start_time = pygame.time.get_ticks()
-                        # 同時觸發閃光彈與誘餌彈效果（畫面震動）
                         global decoy_active, decoy_start_time
                         decoy_active = True
                         decoy_start_time = pygame.time.get_ticks()
                     elif brick.type == "thermite":
                         add_bombs(bricks, 3)
+                    elif brick.type == "jammer":
+                        jammer_active = True
+                        jammer_x = bg_x
+                        global jammer_slide_count
+                        jammer_slide_count = 0
                     score += 1
                     if (
                         self.x < brick.rect.x
@@ -160,10 +168,10 @@ def generate_brick_types(
     bomb_count,
     flash_count,
     thermite_count,
+    jammer_count,
     bricks_row,
     bricks_col,
 ):
-    # 先產生所有位置
     positions = [(col, row) for col in range(bricks_col) for row in range(bricks_row)]
     random.shuffle(positions)
     heal_pos = set(positions[:heal_count])
@@ -181,7 +189,18 @@ def generate_brick_types(
             + thermite_count
         ]
     )
-    # 建立型態列表
+    jammer_pos = set(
+        positions[
+            heal_count
+            + bomb_count
+            + flash_count
+            + thermite_count : heal_count
+            + bomb_count
+            + flash_count
+            + thermite_count
+            + jammer_count
+        ]
+    )
     type_map = {}
     for pos in heal_pos:
         type_map[pos] = "heal"
@@ -191,6 +210,8 @@ def generate_brick_types(
         type_map[pos] = "flash"
     for pos in thermite_pos:
         type_map[pos] = "thermite"
+    for pos in jammer_pos:
+        type_map[pos] = "jammer"
     types = []
     for col in range(bricks_col):
         for row in range(bricks_row):
@@ -199,9 +220,9 @@ def generate_brick_types(
     return types
 
 
-# 產生磚塊時分配5個治療、5個爆炸、3個閃光彈、3個鋁熱彈，其餘普通
+# 產生磚塊時分配5個治療、5個爆炸、3個閃光彈、3個鋁熱彈、2個干擾彈，其餘普通
 total_bricks = bricks_row * bricks_col
-brick_types = generate_brick_types(total_bricks, 5, 5, 3, 3, bricks_row, bricks_col)
+brick_types = generate_brick_types(total_bricks, 5, 5, 3, 3, 2, bricks_row, bricks_col)
 idx = 0
 for col in range(bricks_col):
     for row in range(bricks_row):
@@ -217,6 +238,8 @@ for col in range(bricks_col):
             color = (255, 255, 255)
         elif brick_type == "thermite":
             color = (255, 140, 0)
+        elif brick_type == "jammer":
+            color = (128, 128, 128)
         else:
             color = (
                 random.randint(0, 255),
@@ -231,7 +254,7 @@ for col in range(bricks_col):
 font_path = "C:/Windows/Fonts/msjh.ttc"
 font = pygame.font.Font(font_path, 32)  # 設定字體與大小
 score = 0  # 分數初始化
-lives = 5  # 新增：剩餘機會（改成5）
+lives = 2  # 新增：剩餘機會（改成2）
 game_over = False  # 新增：遊戲結束狀態
 
 # 新增：初始化閃光彈狀態與持續時間
@@ -244,15 +267,24 @@ decoy_active = False
 decoy_start_time = 0
 DECOY_DURATION = 1000  # 毫秒
 
+# 新增：干擾彈狀態
+jammer_active = False
+jammer_x = None
+JAMMER_SPEED = 20
+JAMMER_DURATION = 60  # 干擾彈滑入幀數
+
 
 def reset_game():
     global score, lives, game_over, bricks, ball, pad
+    global decoy_active, decoy_start_time, jammer_active, jammer_x, jammer_slide_count
     score = 0
-    lives = 5  # 重設時也改成5
+    lives = 2  # 重設時也改成2
     game_over = False
     bricks.clear()
     total_bricks = bricks_row * bricks_col
-    brick_types = generate_brick_types(total_bricks, 5, 5, 3, 3, bricks_row, bricks_col)
+    brick_types = generate_brick_types(
+        total_bricks, 5, 5, 3, 3, 2, bricks_row, bricks_col
+    )
     idx = 0
     for col in range(bricks_col):
         for row in range(bricks_row):
@@ -283,6 +315,12 @@ def reset_game():
     ball.speed_x = 5
     ball.speed_y = -5
     ball.is_moving = False
+    # 重設特殊效果狀態
+    decoy_active = False
+    decoy_start_time = 0
+    jammer_active = False
+    jammer_x = None
+    jammer_slide_count = 0
 
 
 def add_bombs(bricks, count):
@@ -405,12 +443,15 @@ while True:
     # 顯示剩餘機會
     lives_surface = font.render(f"機會: {lives}", True, (255, 255, 255))
     screen.blit(lives_surface, (10, 50))
+    # 右上角目標分數
+    target_surface = font.render("目標分數: 70", True, (255, 255, 0))
+    screen.blit(target_surface, (bg_x - target_surface.get_width() - 10, 10))
 
     pad.draw(screen)
     ball.draw(screen)  # 繪製球
 
     # 勝利判斷
-    if score >= 60 and not game_over:
+    if score >= 70 and not game_over:
         game_over = True
         win = True
     else:
@@ -442,5 +483,24 @@ while True:
             continue
         else:
             flash_active = False
+
+    # 干擾彈效果
+    if jammer_active:
+        if "jammer_slide_count" not in globals():
+            jammer_slide_count = 0
+        jammer_x -= JAMMER_SPEED
+        jammer_slide_count += 1
+        # 畫滿屏的666
+        jammer_font = pygame.font.Font(font_path, 80)
+        for y in range(0, bg_y, 80):
+            for x in range(jammer_x, bg_x, 120):
+                text = jammer_font.render("666", True, (255, 0, 0))
+                screen.blit(text, (x, y))
+        pygame.display.update()
+        if jammer_x <= -bg_x or jammer_slide_count > JAMMER_DURATION:
+            jammer_active = False
+            jammer_x = None
+            jammer_slide_count = 0
+        continue
 
     pygame.display.update()  # 更新視窗
