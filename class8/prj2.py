@@ -14,9 +14,7 @@ class Player:
         """
         self.rect = pygame.Rect(x, y, width, height)
         self.color = color
-        self.vy = 0  # 垂直速度
-        self.gravity = 0.5  # 重力加速度
-        self.jump_power = -10  # 跳躍初速度（負值向上）
+        self.speed = 5  # 主角移動速度
 
     def draw(self, display_area):
         """
@@ -27,47 +25,24 @@ class Player:
 
     def move(self, direction, bg_x):
         """
-        主角左右移動與穿牆
+        主角左右移動，並實現穿牆效果
         direction: -1(左), 1(右)
-        bg_x: 視窗寬度
+        bg_x: 遊戲視窗寬度
         """
-        speed = 5  # 每次移動5像素
-        self.rect.x += direction * speed
-        # 穿牆效果
+        self.rect.x += direction * self.speed
+        # 穿牆效果：完全離開左邊界，出現在右側
         if self.rect.right < 0:
             self.rect.left = bg_x
+        # 穿牆效果：完全離開右邊界，出現在左側
         elif self.rect.left > bg_x:
             self.rect.right = 0
-
-    def jump(self):
-        """
-        讓主角跳躍（只有在站在地面時才能跳）
-        """
-        if self.on_ground():
-            self.vy = self.jump_power
-
-    def update(self, win_height):
-        """
-        更新主角位置，實現重力與落地判斷
-        """
-        self.vy += self.gravity  # 速度受重力影響
-        self.rect.y += int(self.vy)
-        # 落地判斷：不能掉出視窗底部
-        ground_y = win_height - 50 - self.rect.height
-        if self.rect.y >= ground_y:
-            self.rect.y = ground_y
-            self.vy = 0
-
-    def on_ground(self):
-        """
-        判斷主角是否站在地面
-        """
-        ground_y = win_height - 50 - self.rect.height
-        return self.rect.y >= ground_y and self.vy == 0
 
 
 ###################### 初始化設定 #######################
 pygame.init()
+
+####################### 新增fps #######################
+FPS = pygame.time.Clock()  # 設定FPS
 
 ###################### 遊戲視窗設定 ######################
 win_width = 400
@@ -86,23 +61,19 @@ player = Player(player_x, player_y, player_width, player_height, player_color)
 
 ###################### 主遊戲迴圈 #######################
 while True:
+    FPS.tick(60)  # 設定FPS為60
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
-        # 按下空白鍵時跳躍
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                player.jump()
 
-    # 處理鍵盤輸入
+    # 處理鍵盤輸入，取得目前按下的按鍵狀態
     keys = pygame.key.get_pressed()
+    # 若按下左方向鍵，主角向左移動
     if keys[pygame.K_LEFT]:
         player.move(-1, win_width)
+    # 若按下右方向鍵，主角向右移動
     if keys[pygame.K_RIGHT]:
         player.move(1, win_width)
-
-    # 更新主角狀態（重力與跳躍）
-    player.update(win_height)
 
     # 填滿背景色
     screen.fill((0, 0, 0))
