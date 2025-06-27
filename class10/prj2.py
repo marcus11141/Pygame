@@ -85,21 +85,20 @@ class Player:
     def check_spring_collision(self, springs):
         """
         檢查主角是否碰到彈簧，若碰到則給予更高的跳躍力
+        修正：只要主角底部與彈簧頂部重疊且左右有交集就觸發，不再限制velocity_y>0
         """
         for spring in springs:
-            # 只在主角往下掉時檢查
-            if self.velocity_y > 0:
-                # 判斷主角底部與彈簧頂部重疊，且左右有交集
-                if (
-                    self.rect.bottom >= spring.rect.top
-                    and self.rect.bottom <= spring.rect.bottom
-                    and self.rect.right > spring.rect.left
-                    and self.rect.left < spring.rect.right
-                ):
-                    # 對齊彈簧頂部並給予更高跳躍力
-                    self.rect.bottom = spring.rect.top
-                    self.velocity_y = -25  # 彈簧跳躍力
-                    return  # 一次只觸發一個彈簧
+            # 判斷主角底部與彈簧頂部重疊，且左右有交集
+            if (
+                self.rect.bottom >= spring.rect.top
+                and self.rect.bottom <= spring.rect.bottom
+                and self.rect.right > spring.rect.left
+                and self.rect.left < spring.rect.right
+            ):
+                # 對齊彈簧頂部並給予更高跳躍力
+                self.rect.bottom = spring.rect.top
+                self.velocity_y = -25  # 彈簧跳躍力
+                return  # 一次只觸發一個彈簧
 
 
 ###################### 平台類別 #######################
@@ -187,7 +186,7 @@ platforms.append(
     Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
 )
 
-for i in range(random.randint(8, 10)):
+for i in range(random.randint(8, 10) + 10):
     x = random.randint(0, win_width - platform_w)
     y = (win_height - 100) - (i * 60)
     platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
@@ -222,9 +221,17 @@ def update_camera_and_platforms():
         score += int(camera_move / 10)
 
     # 移除超出畫面底部的平台
-    platforms[:] = [plat for plat in platforms if plat.rect.top < win_height]
+    new_platforms = []
+    for plat in platforms:
+        if plat.rect.top < win_height:
+            new_platforms.append(plat)
+    platforms[:] = new_platforms
     # === 新增：移除超出畫面底部的彈簧 ===
-    springs[:] = [spring for spring in springs if spring.rect.top < win_height]
+    new_springs = []
+    for spring in springs:
+        if spring.rect.top < win_height:
+            new_springs.append(spring)
+    springs[:] = new_springs
 
     # 追蹤目前最高的平台y座標
     y_min = min(plat.rect.y for plat in platforms)
@@ -299,6 +306,10 @@ while True:
         player.check_spring_collision(springs)  # 先檢查彈簧
         player.check_platform_collision(platforms)  # 再檢查平台
 
+        # 修正：如果角色站在平台上，再檢查一次彈簧碰撞（確保站上平台時也能觸發彈簧）
+        if player.on_platform:
+            player.check_spring_collision(springs)
+
         # 畫面捲動與平台生成，並計算分數
         update_camera_and_platforms()
 
@@ -309,7 +320,7 @@ while True:
             if score > highest_score:
                 highest_score = score
 
-    # 填滿背景色
+    # 塗滿背景色
     screen.fill((0, 0, 0))
 
     # 依序繪製所有平台

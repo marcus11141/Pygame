@@ -73,6 +73,10 @@ class Player:
                         and test_rect.right > platform.rect.left
                         and test_rect.left < platform.rect.right
                     ):
+                        # === 步驟10: 處理只能踩一次的特殊平台 ===
+                        if platform.special:
+                            # 若是紅色特殊平台，踩到後立即消失
+                            platforms.remove(platform)
                         # 對齊平台頂部並彈跳
                         self.rect.bottom = platform.rect.top
                         self.velocity_y = self.jump_power
@@ -85,34 +89,35 @@ class Player:
     def check_spring_collision(self, springs):
         """
         檢查主角是否碰到彈簧，若碰到則給予更高的跳躍力
+        修正：只要主角底部與彈簧頂部重疊且左右有交集就觸發，不再限制velocity_y>0
         """
         for spring in springs:
-            # 只在主角往下掉時檢查
-            if self.velocity_y > 0:
-                # 判斷主角底部與彈簧頂部重疊，且左右有交集
-                if (
-                    self.rect.bottom >= spring.rect.top
-                    and self.rect.bottom <= spring.rect.bottom
-                    and self.rect.right > spring.rect.left
-                    and self.rect.left < spring.rect.right
-                ):
-                    # 對齊彈簧頂部並給予更高跳躍力
-                    self.rect.bottom = spring.rect.top
-                    self.velocity_y = -25  # 彈簧跳躍力
-                    return  # 一次只觸發一個彈簧
+            # 判斷主角底部與彈簧頂部重疊，且左右有交集
+            if (
+                self.rect.bottom >= spring.rect.top
+                and self.rect.bottom <= spring.rect.bottom
+                and self.rect.right > spring.rect.left
+                and self.rect.left < spring.rect.right
+            ):
+                # 對齊彈簧頂部並給予更高跳躍力
+                self.rect.bottom = spring.rect.top
+                self.velocity_y = -25  # 彈簧跳躍力
+                return  # 一次只觸發一個彈簧
 
 
 ###################### 平台類別 #######################
 class Platform:
-    def __init__(self, x, y, width, height, color):
+    def __init__(self, x, y, width, height, color, special=False):
         """
         初始化平台
         x, y: 平台左上角座標
         width, height: 平台寬高
         color: 平台顏色 (RGB)
+        special: 是否為只能踩一次的特殊平台（紅色）
         """
         self.rect = pygame.Rect(x, y, width, height)
         self.color = color
+        self.special = special  # 改名：是否為只能踩一次的特殊平台
 
     def draw(self, display_area):
         """
@@ -183,14 +188,22 @@ platforms = []
 
 platform_x = (win_width - platform_w) // 2
 platform_y = win_height - platform_h - 10
+# 起始平台一定是白色且不可破壞
 platforms.append(
     Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
 )
 
-for i in range(random.randint(8, 10)):
+for i in range(random.randint(8, 10) + 10):
     x = random.randint(0, win_width - platform_w)
     y = (win_height - 100) - (i * 60)
-    platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
+    # === 步驟10: 依分數決定平台類型 ===
+    if score > 100 and random.random() < 0.2:
+        # 生成紅色只能踩一次的特殊平台
+        platforms.append(
+            Platform(x, y, platform_w, platform_h, (255, 0, 0), special=True)
+        )
+    else:
+        platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
 
 # === 新增：隨機生成彈簧道具，機率20%，生成在平台上方 ===
 for plat in platforms:
@@ -222,9 +235,17 @@ def update_camera_and_platforms():
         score += int(camera_move / 10)
 
     # 移除超出畫面底部的平台
-    platforms[:] = [plat for plat in platforms if plat.rect.top < win_height]
+    new_platforms = []
+    for plat in platforms:
+        if plat.rect.top < win_height:
+            new_platforms.append(plat)
+    platforms[:] = new_platforms
     # === 新增：移除超出畫面底部的彈簧 ===
-    springs[:] = [spring for spring in springs if spring.rect.top < win_height]
+    new_springs = []
+    for spring in springs:
+        if spring.rect.top < win_height:
+            new_springs.append(spring)
+    springs[:] = new_springs
 
     # 追蹤目前最高的平台y座標
     y_min = min(plat.rect.y for plat in platforms)
@@ -234,7 +255,14 @@ def update_camera_and_platforms():
         # 在最高平台上方60像素處生成新平台
         new_x = random.randint(0, win_width - platform_w)
         new_y = y_min - 60
-        new_plat = Platform(new_x, new_y, platform_w, platform_h, platform_color)
+        # === 步驟10: 依分數決定新平台類型 ===
+        if score > 100 and random.random() < 0.2:
+            # 生成紅色只能踩一次的特殊平台
+            new_plat = Platform(
+                new_x, new_y, platform_w, platform_h, (255, 0, 0), special=True
+            )
+        else:
+            new_plat = Platform(new_x, new_y, platform_w, platform_h, platform_color)
         platforms.append(new_plat)
         y_min = new_y  # 更新最高平台位置
         # === 新增：新平台有20%機率生成彈簧在其上方 ===
@@ -261,12 +289,14 @@ def reset_game():
     springs.clear()  # === 新增：清空彈簧列表 ===
     platform_x = (win_width - platform_w) // 2
     platform_y = win_height - platform_h - 10
+    # 起始平台一定是白色且不可破壞
     platforms.append(
         Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
     )
     for i in range(random.randint(8, 10)):
         x = random.randint(0, win_width - platform_w)
         y = (win_height - 100) - (i * 60)
+        # === 步驟10: 重設時皆為一般平台 ===
         plat = Platform(x, y, platform_w, platform_h, platform_color)
         platforms.append(plat)
         # === 新增：隨機生成彈簧在新平台上方 ===
@@ -299,6 +329,10 @@ while True:
         player.check_spring_collision(springs)  # 先檢查彈簧
         player.check_platform_collision(platforms)  # 再檢查平台
 
+        # 修正：如果角色站在平台上，再檢查一次彈簧碰撞（確保站上平台時也能觸發彈簧）
+        if player.on_platform:
+            player.check_spring_collision(springs)
+
         # 畫面捲動與平台生成，並計算分數
         update_camera_and_platforms()
 
@@ -309,7 +343,7 @@ while True:
             if score > highest_score:
                 highest_score = score
 
-    # 填滿背景色
+    # 塗滿背景色
     screen.fill((0, 0, 0))
 
     # 依序繪製所有平台
@@ -345,5 +379,3 @@ while True:
 
     # 更新畫面
     pygame.display.update()
-
-pygame.quit()
