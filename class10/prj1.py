@@ -3,11 +3,6 @@ import pygame
 import sys
 import random
 
-######################全域變數######################
-score = 0  # 當前分數
-highest_score = 0  # 最高分數
-game_over = False  # 遊戲結束狀態
-initial_player_y = 0  # 玩家初始高度（用於分數計算）
 
 ###################### 主角類別 #######################
 class Player:
@@ -107,15 +102,45 @@ class Platform:
         pygame.draw.rect(display_area, self.color, self.rect)
 
 
+###################### 彈簧類別 #######################
+class Spring:
+    """
+    彈簧道具類別
+    x, y: 彈簧左上角座標
+    width, height: 彈簧寬高
+    color: 彈簧顏色 (RGB)
+    """
+
+    def __init__(self, x, y, width=20, height=10, color=(255, 255, 0)):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = color
+
+    def draw(self, display_area):
+        """
+        繪製彈簧
+        display_area: pygame 的畫布
+        """
+        pygame.draw.rect(display_area, self.color, self.rect)
+
+
+###################### 全域變數 #######################
+score = 0  # 當前分數
+highest_score = 0  # 最高分
+game_over = False  # 遊戲是否結束
+initial_player_y = 0  # 玩家初始高度（用於計算分數）
+
+# === 新增：彈簧列表 ===
+springs = []
+
 ###################### 初始化設定 #######################
 pygame.init()
 FPS = pygame.time.Clock()  # 設定FPS
 
-###################### 字體設定 ######################
+###################### 字體設定 #######################
 font_path = "C:/Windows/Fonts/msjh.ttc"
 font = pygame.font.Font(font_path, 32)
 
-###################### 遊戲視窗設定 ######################
+###################### 遊戲視窗設定 #####################
 win_width = 400
 win_height = 600
 screen = pygame.display.set_mode((win_width, win_height))
@@ -128,7 +153,9 @@ player_color = (0, 255, 0)  # 綠色
 player_x = (win_width - player_width) // 2
 player_y = win_height - 50 - player_height
 player = Player(player_x, player_y, player_width, player_height, player_color)
-initial_player_y = player.rect.y  # 記錄初始高度
+
+# 記錄初始高度（分數計算用）
+initial_player_y = player.rect.y
 
 ###################### 平台設定（多平台） #########################
 platform_w = 60
@@ -149,27 +176,15 @@ for i in range(random.randint(8, 10)):
     y = (win_height - 100) - (i * 60)
     platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
 
-def reset_game():
-    """
-    遊戲重新開始時重設所有狀態
-    """
-    global score, game_over, player, platforms, initial_player_y
-    score = 0
-    game_over = False
-    # 重設主角
-    player.rect.x = (win_width - player_width) // 2
-    player.rect.y = win_height - 50 - player_height
-    player.velocity_y = 0
-    initial_player_y = player.rect.y
-    # 重設平台
-    platforms.clear()
-    platforms.append(
-        Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
-    )
-    for i in range(random.randint(8, 10)):
-        x = random.randint(0, win_width - platform_w)
-        y = (win_height - 100) - (i * 60)
-        platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
+# === 新增：隨機生成彈簧道具，機率20%，生成在平台上方 ===
+for plat in platforms:
+    if plat is not platforms[0] and random.random() < 0.2:
+        spring_x = plat.rect.x + (plat.rect.width - 20) // 2
+        spring_y = plat.rect.y - 10  # 彈簧在平台正上方
+        springs.append(Spring(spring_x, spring_y))
+
+# === 步驟6: 畫面捲動與平台生成 ===
+
 
 def update_camera_and_platforms():
     """
@@ -186,11 +201,16 @@ def update_camera_and_platforms():
         # 所有平台往下移動camera_move像素
         for plat in platforms:
             plat.rect.y += camera_move
+        # === 新增：所有彈簧也要跟著平台一起往下移動 ===
+        for spring in springs:
+            spring.rect.y += camera_move
         # 分數計算：每上升10像素加1分
         score += int(camera_move / 10)
 
     # 移除超出畫面底部的平台
     platforms[:] = [plat for plat in platforms if plat.rect.top < win_height]
+    # === 新增：移除超出畫面底部的彈簧 ===
+    springs[:] = [spring for spring in springs if spring.rect.top < win_height]
 
     # 追蹤目前最高的平台y座標
     y_min = min(plat.rect.y for plat in platforms)
@@ -200,8 +220,47 @@ def update_camera_and_platforms():
         # 在最高平台上方60像素處生成新平台
         new_x = random.randint(0, win_width - platform_w)
         new_y = y_min - 60
-        platforms.append(Platform(new_x, new_y, platform_w, platform_h, platform_color))
+        new_plat = Platform(new_x, new_y, platform_w, platform_h, platform_color)
+        platforms.append(new_plat)
         y_min = new_y  # 更新最高平台位置
+        # === 新增：新平台有20%機率生成彈簧在其上方 ===
+        if random.random() < 0.2:
+            spring_x = new_x + (platform_w - 20) // 2
+            spring_y = new_y - 10
+            springs.append(Spring(spring_x, spring_y))
+
+
+def reset_game():
+    """
+    遊戲重新開始時重設所有狀態
+    """
+    global score, game_over, platforms, player, initial_player_y, springs
+    score = 0
+    game_over = False
+    # 重設主角位置
+    player.rect.x = (win_width - player_width) // 2
+    player.rect.y = win_height - 50 - player_height
+    player.velocity_y = 0
+    initial_player_y = player.rect.y
+    # 重新生成平台
+    platforms.clear()
+    springs.clear()  # === 新增：清空彈簧列表 ===
+    platform_x = (win_width - platform_w) // 2
+    platform_y = win_height - platform_h - 10
+    platforms.append(
+        Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
+    )
+    for i in range(random.randint(8, 10)):
+        x = random.randint(0, win_width - platform_w)
+        y = (win_height - 100) - (i * 60)
+        plat = Platform(x, y, platform_w, platform_h, platform_color)
+        platforms.append(plat)
+        # === 新增：隨機生成彈簧在新平台上方 ===
+        if plat is not platforms[0] and random.random() < 0.2:
+            spring_x = plat.rect.x + (plat.rect.width - 20) // 2
+            spring_y = plat.rect.y - 10
+            springs.append(Spring(spring_x, spring_y))
+
 
 ###################### 主遊戲迴圈 #######################
 while True:
@@ -209,13 +268,13 @@ while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
-        # 遊戲結束時按任意鍵重新開始
-        if game_over and (event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN):
+        # 遊戲結束時，按任意鍵重新開始
+        if game_over and event.type == pygame.KEYDOWN:
             reset_game()
 
+    # 處理鍵盤輸入，取得目前按下的按鍵狀態
+    keys = pygame.key.get_pressed()
     if not game_over:
-        # 處理鍵盤輸入，取得目前按下的按鍵狀態
-        keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
             player.move(-1, win_width)
         if keys[pygame.K_RIGHT]:
@@ -225,13 +284,13 @@ while True:
         player.apply_gravity()
         player.check_platform_collision(platforms)
 
-        # 畫面捲動與平台生成、分數計算
+        # 畫面捲動與平台生成，並計算分數
         update_camera_and_platforms()
 
-        # 判斷遊戲結束（主角掉出畫面底部）
+        # 判斷遊戲結束：主角掉出畫面底部
         if player.rect.top > win_height:
             game_over = True
-            global highest_score
+            # 更新最高分
             if score > highest_score:
                 highest_score = score
 
@@ -241,6 +300,10 @@ while True:
     # 依序繪製所有平台
     for plat in platforms:
         plat.draw(screen)
+
+    # === 新增：繪製所有彈簧道具 ===
+    for spring in springs:
+        spring.draw(screen)
 
     # 繪製主角
     player.draw(screen)
@@ -252,15 +315,17 @@ while True:
     high_surface = font.render(f"最高分: {highest_score}", True, (255, 255, 0))
     screen.blit(high_surface, (10, 50))
 
-    # 顯示遊戲結束提示
+    # 遊戲結束畫面
     if game_over:
         over_surface = font.render("遊戲結束", True, (255, 0, 0))
         screen.blit(
-            over_surface, (win_width // 2 - over_surface.get_width() // 2, win_height // 2 - 40)
+            over_surface,
+            (win_width // 2 - over_surface.get_width() // 2, win_height // 2 - 40),
         )
         tip_surface = font.render("按任意鍵重新開始", True, (255, 255, 255))
         screen.blit(
-            tip_surface, (win_width // 2 - tip_surface.get_width() // 2, win_height // 2 + 10)
+            tip_surface,
+            (win_width // 2 - tip_surface.get_width() // 2, win_height // 2 + 10),
         )
 
     # 更新畫面

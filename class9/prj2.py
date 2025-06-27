@@ -3,11 +3,6 @@ import pygame
 import sys
 import random
 
-######################全域變數######################
-score = 0  # 當前分數
-highest_score = 0  # 最高分數
-game_over = False  # 遊戲結束狀態
-initial_player_y = 0  # 玩家初始高度（用於分數計算）
 
 ###################### 主角類別 #######################
 class Player:
@@ -107,15 +102,22 @@ class Platform:
         pygame.draw.rect(display_area, self.color, self.rect)
 
 
+###################### 全域變數 #######################
+score = 0  # 當前分數
+highest_score = 0  # 最高分
+game_over = False  # 遊戲是否結束
+initial_player_y = 0  # 玩家初始高度（用於計算分數）
+
+
 ###################### 初始化設定 #######################
 pygame.init()
 FPS = pygame.time.Clock()  # 設定FPS
 
-###################### 字體設定 ######################
+###################### 字體設定 #######################
 font_path = "C:/Windows/Fonts/msjh.ttc"
 font = pygame.font.Font(font_path, 32)
 
-###################### 遊戲視窗設定 ######################
+###################### 遊戲視窗設定 #####################
 win_width = 400
 win_height = 600
 screen = pygame.display.set_mode((win_width, win_height))
@@ -128,7 +130,9 @@ player_color = (0, 255, 0)  # 綠色
 player_x = (win_width - player_width) // 2
 player_y = win_height - 50 - player_height
 player = Player(player_x, player_y, player_width, player_height, player_color)
-initial_player_y = player.rect.y  # 記錄初始高度
+
+# 記錄初始高度（分數計算用）
+initial_player_y = player.rect.y
 
 ###################### 平台設定（多平台） #########################
 platform_w = 60
@@ -149,27 +153,8 @@ for i in range(random.randint(8, 10)):
     y = (win_height - 100) - (i * 60)
     platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
 
-def reset_game():
-    """
-    遊戲重新開始時重設所有狀態
-    """
-    global score, game_over, player, platforms, initial_player_y
-    score = 0
-    game_over = False
-    # 重設主角
-    player.rect.x = (win_width - player_width) // 2
-    player.rect.y = win_height - 50 - player_height
-    player.velocity_y = 0
-    initial_player_y = player.rect.y
-    # 重設平台
-    platforms.clear()
-    platforms.append(
-        Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
-    )
-    for i in range(random.randint(8, 10)):
-        x = random.randint(0, win_width - platform_w)
-        y = (win_height - 100) - (i * 60)
-        platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
+# === 步驟6: 畫面捲動與平台生成 ===
+
 
 def update_camera_and_platforms():
     """
@@ -203,19 +188,45 @@ def update_camera_and_platforms():
         platforms.append(Platform(new_x, new_y, platform_w, platform_h, platform_color))
         y_min = new_y  # 更新最高平台位置
 
+
+def reset_game():
+    """
+    遊戲重新開始時重設所有狀態
+    """
+    global score, game_over, platforms, player, initial_player_y
+    score = 0
+    game_over = False
+    # 重設主角位置
+    player.rect.x = (win_width - player_width) // 2
+    player.rect.y = win_height - 50 - player_height
+    player.velocity_y = 0
+    initial_player_y = player.rect.y
+    # 重新生成平台
+    platforms.clear()
+    platform_x = (win_width - platform_w) // 2
+    platform_y = win_height - platform_h - 10
+    platforms.append(
+        Platform(platform_x, platform_y, platform_w, platform_h, platform_color)
+    )
+    for i in range(random.randint(8, 10)):
+        x = random.randint(0, win_width - platform_w)
+        y = (win_height - 100) - (i * 60)
+        platforms.append(Platform(x, y, platform_w, platform_h, platform_color))
+
+
 ###################### 主遊戲迴圈 #######################
 while True:
     FPS.tick(60)  # 設定FPS為60
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
-        # 遊戲結束時按任意鍵重新開始
-        if game_over and (event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN):
+        # 遊戲結束時，按任意鍵重新開始
+        if game_over and event.type == pygame.KEYDOWN:
             reset_game()
 
+    # 處理鍵盤輸入，取得目前按下的按鍵狀態
+    keys = pygame.key.get_pressed()
     if not game_over:
-        # 處理鍵盤輸入，取得目前按下的按鍵狀態
-        keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
             player.move(-1, win_width)
         if keys[pygame.K_RIGHT]:
@@ -225,13 +236,13 @@ while True:
         player.apply_gravity()
         player.check_platform_collision(platforms)
 
-        # 畫面捲動與平台生成、分數計算
+        # 畫面捲動與平台生成，並計算分數
         update_camera_and_platforms()
 
-        # 判斷遊戲結束（主角掉出畫面底部）
+        # 判斷遊戲結束：主角掉出畫面底部
         if player.rect.top > win_height:
             game_over = True
-            global highest_score
+            # 更新最高分
             if score > highest_score:
                 highest_score = score
 
@@ -252,15 +263,17 @@ while True:
     high_surface = font.render(f"最高分: {highest_score}", True, (255, 255, 0))
     screen.blit(high_surface, (10, 50))
 
-    # 顯示遊戲結束提示
+    # 遊戲結束畫面
     if game_over:
         over_surface = font.render("遊戲結束", True, (255, 0, 0))
         screen.blit(
-            over_surface, (win_width // 2 - over_surface.get_width() // 2, win_height // 2 - 40)
+            over_surface,
+            (win_width // 2 - over_surface.get_width() // 2, win_height // 2 - 40),
         )
         tip_surface = font.render("按任意鍵重新開始", True, (255, 255, 255))
         screen.blit(
-            tip_surface, (win_width // 2 - tip_surface.get_width() // 2, win_height // 2 + 10)
+            tip_surface,
+            (win_width // 2 - tip_surface.get_width() // 2, win_height // 2 + 10),
         )
 
     # 更新畫面
