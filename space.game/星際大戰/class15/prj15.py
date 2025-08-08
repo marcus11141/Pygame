@@ -4,9 +4,8 @@ import sys  # 系統相關功能（如結束程式）
 import os  # 處理路徑用
 
 ###################### 初始化設定 #######################
-pygame.init()  # 初始化 pygame
+pygame.init()  # 初始化 pygame(把程式打開)
 FPS = pygame.time.Clock()  # 設定 FPS 時脈
-
 ###################### 載入背景圖片 #######################
 # 設定圖片路徑
 base_dir = os.path.dirname(os.path.abspath(__file__))  # 取得目前檔案所在資料夾
