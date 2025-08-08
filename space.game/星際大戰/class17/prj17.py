@@ -30,9 +30,24 @@ screen = pygame.display.set_mode((bg_width, bg_height))  # 視窗大小與圖片
 pygame.display.set_caption("Space Background Scroll")  # 視窗標題
 
 # ====================== 載入飛船圖片與初始參數 ======================
-# 載入飛船圖片
-fighter_path = os.path.join(image_dir, "fighter_M.png")  # 飛船圖片完整路徑
-fighter_img = pygame.image.load(fighter_path)  # 載入飛船圖片
+
+# ====================== 載入飛船圖片（左右方向） ======================
+# 載入三種飛船圖片：預設（中）、左、右
+# fighter_img_M：預設靜止或垂直移動時顯示
+# fighter_img_L：往左移動時顯示
+# fighter_img_R：往右移動時顯示
+fighter_img_M = pygame.image.load(
+    os.path.join(image_dir, "fighter_M.png")
+)  # 預設飛船圖片
+fighter_img_L = pygame.image.load(
+    os.path.join(image_dir, "fighter_L.png")
+)  # 左移飛船圖片
+fighter_img_R = pygame.image.load(
+    os.path.join(image_dir, "fighter_R.png")
+)  # 右移飛船圖片
+
+# 預設顯示中間飛船（靜止或上下移動時）
+fighter_img = fighter_img_M
 fighter_rect = fighter_img.get_rect()  # 取得飛船矩形區域
 
 # 設定飛船初始位置（畫面中央下方）
@@ -51,20 +66,23 @@ while True:
         if event.type == pygame.QUIT:
             sys.exit()  # 關閉視窗時結束程式
         # ====================== 監聽鍵盤事件 ======================
-        # 按下鍵盤時設定速度
+        # 按下鍵盤時設定速度與切換對應圖片
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 fighter_speed_x = -fighter_move_speed  # 左移
+                fighter_img = fighter_img_L  # 切換為左移圖片
             elif event.key == pygame.K_RIGHT:
                 fighter_speed_x = fighter_move_speed  # 右移
+                fighter_img = fighter_img_R  # 切換為右移圖片
             elif event.key == pygame.K_UP:
                 fighter_speed_y = -fighter_move_speed  # 上移
             elif event.key == pygame.K_DOWN:
                 fighter_speed_y = fighter_move_speed  # 下移
-        # 放開鍵盤時停止移動
+        # 放開鍵盤時停止移動，恢復預設圖片（靜止或上下移動時）
         if event.type == pygame.KEYUP:
             if event.key in [pygame.K_LEFT, pygame.K_RIGHT]:
                 fighter_speed_x = 0
+                fighter_img = fighter_img_M  # 恢復預設圖片
             if event.key in [pygame.K_UP, pygame.K_DOWN]:
                 fighter_speed_y = 0
 
