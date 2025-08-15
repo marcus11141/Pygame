@@ -6,6 +6,6 @@ tools: ['codebase', 'editFiles', 'fetch', 'problems', 'runCommands', 'search', '
 # 開發步驟
 
 - 遵守開發規範
-- 請修改`space.game\星際大戰\class17\prj17.py`
-- 當飛船往左飛行時，飛船的圖片為`space.game\星際大戰\image\fighter_L.png`
-- 當飛船往右飛行時，飛船的圖片為`space.game\星際大戰\image\fighter_R.png`
+- 每一行加入詳細註解
+- 請修改`space.game\class19\prj19.py`
+- 請在飛機尾部做出持續噴射的這張圖片`space.game\class19\image\starship_burner.png`
